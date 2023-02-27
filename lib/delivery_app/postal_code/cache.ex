@@ -5,7 +5,7 @@ defmodule DeliveryApp.PostalCode.Cache do
     GenServer.start_link(__MODULE__, %{}, name: :postal_code_cache)
   end
 
-  def init() do
+  def init(_) do
     state = %{
       distance: %{}
     }
@@ -24,9 +24,8 @@ defmodule DeliveryApp.PostalCode.Cache do
   # Callbacks
 
   def handle_call({:get_distance, from, to}, _from, state) do
-    key = MapSet.new([from, to])
-    distance_map = Map.get(state, :distance)
-    distance = Map.get(distance_map, key)
+    key = generate_key(from, to)
+    distance = get_in(state, [:distance, key])
 
     {:reply, distance, state}
   end
@@ -34,11 +33,10 @@ defmodule DeliveryApp.PostalCode.Cache do
   def handle_cast({:set_distance, from, to, distance}, state) do
     key = MapSet.new([from, to])
 
-    state =
-      Map.update!(state, :distance, fn distance_map ->
-        Map.put(distance_map, key, distance)
-      end)
+    state = put_in(state, [:distance, key], distance)
 
     {:noreply, state}
   end
+
+  defp generate_key(from, to), do: MapSet.new([from, to])
 end

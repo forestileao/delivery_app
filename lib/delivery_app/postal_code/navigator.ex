@@ -2,7 +2,7 @@ defmodule DeliveryApp.PostalCode.Navigator do
   use GenServer
 
   alias :math, as: Math
-  alias DeliveryApp.PostalCode.Store
+  alias DeliveryApp.PostalCode.{Cache, Store}
 
   # kilometers
   @radius 6378
@@ -23,23 +23,37 @@ defmodule DeliveryApp.PostalCode.Navigator do
   end
 
   defp do_get_distance(from, to) do
-    from_distance = get_geolocation!(from)
-    to_distance = get_geolocation!(to)
+    from = format_postal_code!(from)
+    to = format_postal_code!(to)
 
-    calculate_distance(from_distance, to_distance)
+    case Cache.get_distance(from, to) do
+      nil -> calculate_and_cache_distance(from, to)
+      distance -> distance
+    end
   end
 
-  defp get_geolocation!(postal_code) when is_binary(postal_code) do
+  defp calculate_and_cache_distance(from, to) do
+    from_distance = get_geolocation(from)
+    to_distance = get_geolocation(to)
+
+    distance = calculate_distance(from_distance, to_distance)
+    Cache.set_distance(from, to, distance)
+    distance
+  end
+
+  defp get_geolocation(postal_code) do
     Store.get_geolocation(postal_code)
   end
 
-  defp get_geolocation!(postal_code) when is_integer(postal_code) do
+  defp format_postal_code!(postal_code) when is_binary(postal_code), do: postal_code
+
+  defp format_postal_code!(postal_code) when is_integer(postal_code) do
     postal_code = Integer.to_string(postal_code)
 
-    get_geolocation!(postal_code)
+    format_postal_code!(postal_code)
   end
 
-  defp get_geolocation!(postal_code) do
+  defp format_postal_code!(postal_code) do
     error = "unexpected `postal_code`, received: (#{inspect(postal_code)})"
     raise ArgumentError, error
   end
